@@ -162,8 +162,6 @@ class PathFinder {
       console.log("DIRECTION NOT RECOGNIZED");
     }
 
-    // console.log("test", this.lastDir);
-
     while (true) {
       console.log("NEW DIR", dir);
 
@@ -190,7 +188,7 @@ class PathFinder {
       }
       if (dir.direction === DIRECTION.RIGHT) {
         dir = this.traverseRight(arr, dir.start.row, dir.start.col);
-        console.log("test", dir);
+
         if (dir.end === SYMBOLS.END) {
           break;
         }
