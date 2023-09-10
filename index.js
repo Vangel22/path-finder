@@ -19,13 +19,13 @@ class PathFinder {
     this.map = map;
     this.collectAlphas = [];
     this.pathAlpha = [];
-    this.markPath = [{ row: -1, col: -1 }];
+    this.lastDir = [];
   }
 
   findDirAvailable(arr, startRow, startCol, symbol) {
     if (symbol === SYMBOLS.START) {
       for (let i = 0; i < arr.length; i++) {
-        for (let j = 0; j < arr[j].length; j++) {
+        for (let j = 0; j < arr[i].length; j++) {
           if (arr[i][j] === symbol) {
             return { row: i, col: j };
           }
@@ -44,35 +44,38 @@ class PathFinder {
     }
   }
 
-  replaceElementsByIndices(originalArray, indicesToReplace) {
-    for (const indices of indicesToReplace) {
-      if (indices[0] >= 0 && indices[0] < originalArray.length) {
-        const row = indices[0];
-        const col = indices[1];
+  // removeTravercedIndices(originalArray, indicesToReplace) {
+  //   for (const indices of indicesToReplace) {
+  //     if (indices[0] >= 0 && indices[0] < originalArray.length) {
+  //       const row = indices[0];
+  //       const col = indices[1];
 
-        if (col >= 0 && col < originalArray[row].length) {
-          originalArray[row][col] = SYMBOLS.MARK;
-        }
-      }
-    }
-  }
+  //       if (col >= 0 && col < originalArray[row].length) {
+  //         originalArray[row].splice(col, 1);
+  //       }
+  //     }
+  //   }
+  //   return originalArray;
+  // }
 
   checkAfterSymbolDirection(arr, startRow, startCol, symbol) {
-    let startPostion = "";
-    if (symbol === SYMBOLS.START) {
-      startPostion = this.findDirAvailable(arr, startRow, startCol, symbol);
-    } else {
-      this.replaceElementsByIndices(arr, this.markPath);
-      startPostion = this.findDirAvailable(arr, startRow, startCol, symbol);
-    }
-    let [up, down, left, right] = [false, false, false, false];
-
-    console.log("checkAfterSymbolDirection", startPostion);
-    console.log("path marked", this.markPath);
+    const startPostion = this.findDirAvailable(arr, startRow, startCol, symbol);
 
     if (startPostion === null) {
       console.log("Start symbol not found");
     }
+
+    let [up, down, left, right] = [false, false, false, false];
+
+    // console.log("arr", arr);
+
+    //up down check
+    // if (
+    //   this.lastDir[this.lastDir.length - 1].col ===
+    //   this.lastDir[this.lastDir.length - 2]
+    // ) {
+    //   return false;
+    // }
 
     if (startPostion.row === 0 && startPostion.col === 0) {
       // Check if the next position contains letter
@@ -149,8 +152,8 @@ class PathFinder {
   traverse(arr) {
     const startAndNext = this.checkAfterSymbolDirection(
       arr,
-      0,
-      0,
+      0, //ignored
+      0, //ignored
       SYMBOLS.START
     );
     let dir = startAndNext;
@@ -159,30 +162,40 @@ class PathFinder {
       console.log("DIRECTION NOT RECOGNIZED");
     }
 
-    while (arr[dir.start.row][dir.start.col] !== SYMBOLS.END) {
+    // console.log("test", this.lastDir);
+
+    while (true) {
       console.log("NEW DIR", dir);
 
       if (dir.direction === DIRECTION.UP) {
         dir = this.traverseUp(arr, dir.start.row, dir.start.col);
-        break;
+        if (dir.end === SYMBOLS.END) {
+          break;
+        }
+        continue;
       }
       if (dir.direction === DIRECTION.DOWN) {
         dir = this.traverseDown(arr, dir.start.row, dir.start.col);
-        break;
+        if (dir.end === SYMBOLS.END) {
+          break;
+        }
+        continue;
       }
       if (dir.direction === DIRECTION.LEFT) {
         dir = this.traverseLeft(arr, dir.start.row, dir.start.col);
-        break;
+        if (dir.end === SYMBOLS.END) {
+          break;
+        }
+        continue;
       }
       if (dir.direction === DIRECTION.RIGHT) {
         dir = this.traverseRight(arr, dir.start.row, dir.start.col);
+        console.log("test", dir);
+        if (dir.end === SYMBOLS.END) {
+          break;
+        }
         continue;
       }
-      // if (!dir.direction) {
-      //   // Handle cases where the direction is not recognized
-      //   console.log("DIRECTION NOT RECOGNIZED");
-      //   break;
-      // }
     }
 
     return {
@@ -192,25 +205,41 @@ class PathFinder {
   }
 
   traverseLeft(arr, startRow, startCol) {
-    let newDirection = "";
-    for (let j = startCol; j >= 0; j--) {
-      this.markPath.push([startRow, j]);
+    let newDirection = {
+      start: {
+        row: undefined,
+        col: undefined,
+      },
+      direction: "",
+      end: "",
+    };
+
+    for (let j = startCol - 1; j >= 0; j--) {
       this.pathAlpha.push(arr[startRow][j]);
+      if (arr[startRow][j] === SYMBOLS.END) {
+        newDirection.end = SYMBOLS.END;
+        break;
+      }
       if (arr[startRow][j] === SYMBOLS.NEW_DIR) {
-        newDirection = this.checkAfterSymbolDirection(arr, SYMBOLS.NEW_DIR);
+        newDirection = this.checkAfterSymbolDirection(
+          arr,
+          startRow,
+          j,
+          SYMBOLS.NEW_DIR
+        );
+        arr[startRow][j] = " ";
         break;
       }
       if (this.isAlpha(arr[startRow][j])) {
         this.collectAlphas.push(arr[startRow][j]);
+        arr[startRow][j] = " ";
       }
       if (arr[startRow][j] === SYMBOLS.HORIZONTAL) {
+        arr[startRow][j] = " ";
         continue;
       }
-      if (arr[startRow][j] === SYMBOLS.END) {
-        newDirection = SYMBOLS.END;
-        break;
-      }
     }
+
     return newDirection;
   }
   traverseRight(arr, startRow, startCol) {
@@ -220,53 +249,73 @@ class PathFinder {
         col: undefined,
       },
       direction: "",
+      end: "",
     };
 
     for (let j = startCol; j < arr[startRow].length; j++) {
-      this.markPath.push([startRow, j]);
       this.pathAlpha.push(arr[startRow][j]);
+      if (arr[startRow][j] === SYMBOLS.END) {
+        newDirection.end = SYMBOLS.END;
+        break;
+      }
       if (arr[startRow][j] === SYMBOLS.NEW_DIR) {
+        // + sign
         newDirection = this.checkAfterSymbolDirection(
           arr,
           startRow,
           j,
           SYMBOLS.NEW_DIR
         );
+        arr[startRow][j] = " ";
         break;
       }
       if (this.isAlpha(arr[startRow][j])) {
         this.collectAlphas.push(arr[startRow][j]);
+        arr[startRow][j] = " ";
       }
       if (arr[startRow][j] === SYMBOLS.HORIZONTAL) {
+        arr[startRow][j] = " ";
         continue;
       }
-      if (arr[startRow][j] === SYMBOLS.END) {
-        newDirection = SYMBOLS.END;
-        break;
-      }
     }
+
     return newDirection;
   }
   traverseUp(arr, startRow, startCol) {
-    let newDirection = "";
+    let newDirection = {
+      start: {
+        row: undefined,
+        col: undefined,
+      },
+      direction: "",
+      end: "",
+    };
     for (let i = startRow - 1; i >= 0; i--) {
-      this.markPath.push([i, startCol]);
       this.pathAlpha.push(arr[i][startCol]);
+      if (arr[i][startCol] === SYMBOLS.END) {
+        newDirection.end = SYMBOLS.END;
+        break;
+      }
       if (arr[i][startCol] === SYMBOLS.NEW_DIR) {
-        newDirection = this.checkAfterSymbolDirection(arr, SYMBOLS.NEW_DIR);
+        newDirection = this.checkAfterSymbolDirection(
+          arr,
+          i,
+          startCol,
+          SYMBOLS.NEW_DIR
+        );
+        arr[i][startCol] = " ";
         break;
       }
       if (this.isAlpha(arr[i][startCol])) {
         this.collectAlphas.push(arr[i][startCol]);
+        arr[i][startCol] = " ";
       }
-      if (arr[i][startCol] === SYMBOLS.HORIZONTAL) {
+      if (arr[i][startCol] === SYMBOLS.VERTICAL) {
+        arr[i][startCol] = " ";
         continue;
       }
-      if (arr[i][startCol] === SYMBOLS.END) {
-        newDirection = SYMBOLS.END;
-        break;
-      }
     }
+    this.lastDir = newDirection.direction;
     return newDirection;
   }
 
@@ -277,34 +326,35 @@ class PathFinder {
         col: undefined,
       },
       direction: "",
+      end: "",
     };
 
     for (let i = startRow + 1; i < arr.length; i++) {
-      this.markPath.push([i, startCol]);
       this.pathAlpha.push(arr[i][startCol]);
+      if (arr[i][startCol] === SYMBOLS.END) {
+        newDirection.end = SYMBOLS.END;
+        break;
+      }
       if (arr[i][startCol] === SYMBOLS.NEW_DIR) {
-        //4 8
         newDirection = this.checkAfterSymbolDirection(
           arr,
           i,
           startCol,
           SYMBOLS.NEW_DIR
         );
+        arr[i][startCol] = " ";
         break;
       }
       if (this.isAlpha(arr[i][startCol])) {
         this.collectAlphas.push(arr[i][startCol]);
+        arr[i][startCol] = " ";
       }
-      if (arr[i][startCol] === SYMBOLS.HORIZONTAL) {
+      if (arr[i][startCol] === SYMBOLS.VERTICAL) {
+        arr[i][startCol] = " ";
         continue;
-      }
-      if (arr[i][startCol] === SYMBOLS.END) {
-        newDirection = SYMBOLS.END; //this needs to be fixed
-        break;
       }
     }
 
-    console.log("new direction", newDirection);
     return newDirection;
   }
 
