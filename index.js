@@ -20,6 +20,7 @@ class PathFinder {
     this.collectAlphas = [];
     this.pathAlpha = [];
     this.lastDir = [];
+    this.copyMap = JSON.parse(JSON.stringify(map));
   }
 
   findDirAvailable(arr, startRow, startCol, symbol) {
@@ -44,41 +45,16 @@ class PathFinder {
     }
   }
 
-  // removeTravercedIndices(originalArray, indicesToReplace) {
-  //   for (const indices of indicesToReplace) {
-  //     if (indices[0] >= 0 && indices[0] < originalArray.length) {
-  //       const row = indices[0];
-  //       const col = indices[1];
-
-  //       if (col >= 0 && col < originalArray[row].length) {
-  //         originalArray[row].splice(col, 1);
-  //       }
-  //     }
-  //   }
-  //   return originalArray;
-  // }
-
   checkAfterSymbolDirection(arr, startRow, startCol, symbol) {
-    const startPostion = this.findDirAvailable(arr, startRow, startCol, symbol);
+    let startPostion = this.findDirAvailable(arr, startRow, startCol, symbol);
 
     if (startPostion === null) {
-      console.log("Start symbol not found");
+      return Error;
     }
 
     let [up, down, left, right] = [false, false, false, false];
 
-    // console.log("arr", arr);
-
-    //up down check
-    // if (
-    //   this.lastDir[this.lastDir.length - 1].col ===
-    //   this.lastDir[this.lastDir.length - 2]
-    // ) {
-    //   return false;
-    // }
-
     if (startPostion.row === 0 && startPostion.col === 0) {
-      // Check if the next position contains letter
       if (arr[startPostion.row + 1][startPostion.col] === SYMBOLS.VERTICAL) {
         down = true;
       } else if (
@@ -113,14 +89,15 @@ class PathFinder {
         left = true;
       }
     }
-    // if we have a symetric matrix we won't need to check for col length
+
     if (startPostion.row > 0 && startPostion.col > 0) {
       if (arr.length - startPostion.row > 1) {
         if (arr[startPostion.row + 1][startPostion.col] === SYMBOLS.VERTICAL) {
           down = true;
         }
       }
-      if (arr.length - startPostion.col > 1) {
+      //changed here with startPosition.row
+      if (arr[startPostion.row].length - startPostion.col > 1) {
         if (
           arr[startPostion.row][startPostion.col + 1] === SYMBOLS.HORIZONTAL
         ) {
@@ -149,6 +126,48 @@ class PathFinder {
     return { start: startPostion, direction: direction[0] };
   }
 
+  checkStartAndMultiple(arr) {
+    let numSym = 0;
+    for (let i = 0; i < arr.length; i++) {
+      for (let j = 0; j < arr[i].length; j++) {
+        if (arr[i][j] === SYMBOLS.START) {
+          numSym++;
+        }
+      }
+    }
+
+    if (numSym > 1) {
+      //multiple starts
+      return Error;
+    } else if (numSym === 0) {
+      //no start found
+      return Error;
+    } else {
+      return "OK";
+    }
+  }
+
+  checkEnd(arr) {
+    let numX = 0;
+    for (let i = 0; i < arr.length; i++) {
+      for (let j = 0; j < arr[i].length; j++) {
+        if (arr[i][j] === SYMBOLS.END) {
+          numX++;
+        }
+      }
+    }
+
+    if (numX > 1) {
+      //multiple starts
+      return Error;
+    } else if (numX === 0) {
+      //no start found
+      return Error;
+    } else {
+      return "OK";
+    }
+  }
+
   traverse(arr) {
     const startAndNext = this.checkAfterSymbolDirection(
       arr,
@@ -158,13 +177,21 @@ class PathFinder {
     );
     let dir = startAndNext;
 
+    //CHECK START
+    const checkStart = this.checkStartAndMultiple(arr);
+    if (checkStart !== "OK") {
+      return checkStart;
+    }
+    const checkEnd = this.checkEnd(arr);
+    if (checkEnd !== "OK") {
+      return checkEnd;
+    }
+
     if (!Object.values(DIRECTION).includes(startAndNext.direction)) {
       console.log("DIRECTION NOT RECOGNIZED");
     }
 
     while (true) {
-      console.log("NEW DIR", dir);
-
       if (dir.direction === DIRECTION.UP) {
         dir = this.traverseUp(arr, dir.start.row, dir.start.col);
         if (dir.end === SYMBOLS.END) {
@@ -196,9 +223,10 @@ class PathFinder {
       }
     }
 
+    const pathString = "@" + this.pathAlpha.join("");
     return {
       letters: this.collectAlphas.join(""),
-      path: this.pathAlpha.join(""),
+      path: pathString,
     };
   }
 
@@ -213,7 +241,11 @@ class PathFinder {
     };
 
     for (let j = startCol - 1; j >= 0; j--) {
-      this.pathAlpha.push(arr[startRow][j]);
+      if (arr[startRow][j] === " ") {
+        this.pathAlpha.push(this.copyMap[startRow][j]);
+      } else {
+        this.pathAlpha.push(arr[startRow][j]);
+      }
       if (arr[startRow][j] === SYMBOLS.END) {
         newDirection.end = SYMBOLS.END;
         break;
@@ -230,6 +262,7 @@ class PathFinder {
       }
       if (this.isAlpha(arr[startRow][j])) {
         this.collectAlphas.push(arr[startRow][j]);
+        //change here for direction change on letter
         arr[startRow][j] = " ";
       }
       if (arr[startRow][j] === SYMBOLS.HORIZONTAL) {
@@ -250,14 +283,20 @@ class PathFinder {
       end: "",
     };
 
-    for (let j = startCol; j < arr[startRow].length; j++) {
-      this.pathAlpha.push(arr[startRow][j]);
+    let changeDirAfterAlpha;
+
+    for (let j = startCol + 1; j < arr[startRow].length; j++) {
+      if (arr[startRow][j] === " ") {
+        this.pathAlpha.push(this.copyMap[startRow][j]);
+        continue;
+      } else {
+        this.pathAlpha.push(arr[startRow][j]);
+      }
       if (arr[startRow][j] === SYMBOLS.END) {
         newDirection.end = SYMBOLS.END;
         break;
       }
       if (arr[startRow][j] === SYMBOLS.NEW_DIR) {
-        // + sign
         newDirection = this.checkAfterSymbolDirection(
           arr,
           startRow,
@@ -269,6 +308,10 @@ class PathFinder {
       }
       if (this.isAlpha(arr[startRow][j])) {
         this.collectAlphas.push(arr[startRow][j]);
+        changeDirAfterAlpha = this.alphaNewDir(arr, startRow, j);
+        if (changeDirAfterAlpha) {
+          newDirection = changeDirAfterAlpha;
+        }
         arr[startRow][j] = " ";
       }
       if (arr[startRow][j] === SYMBOLS.HORIZONTAL) {
@@ -288,8 +331,15 @@ class PathFinder {
       direction: "",
       end: "",
     };
+    let changeDirAfterAlpha;
+
     for (let i = startRow - 1; i >= 0; i--) {
-      this.pathAlpha.push(arr[i][startCol]);
+      if (arr[i][startCol] === " ") {
+        this.pathAlpha.push(this.copyMap[i][startCol]);
+        continue;
+      } else {
+        this.pathAlpha.push(arr[i][startCol]);
+      }
       if (arr[i][startCol] === SYMBOLS.END) {
         newDirection.end = SYMBOLS.END;
         break;
@@ -306,6 +356,10 @@ class PathFinder {
       }
       if (this.isAlpha(arr[i][startCol])) {
         this.collectAlphas.push(arr[i][startCol]);
+        changeDirAfterAlpha = this.alphaNewDir(arr, i, startCol);
+        if (changeDirAfterAlpha) {
+          newDirection = changeDirAfterAlpha;
+        }
         arr[i][startCol] = " ";
       }
       if (arr[i][startCol] === SYMBOLS.VERTICAL) {
@@ -313,7 +367,7 @@ class PathFinder {
         continue;
       }
     }
-    this.lastDir = newDirection.direction;
+
     return newDirection;
   }
 
@@ -327,8 +381,14 @@ class PathFinder {
       end: "",
     };
 
+    let changeDirAfterAlpha;
+
     for (let i = startRow + 1; i < arr.length; i++) {
-      this.pathAlpha.push(arr[i][startCol]);
+      if (arr[i][startCol] === " ") {
+        this.pathAlpha.push(this.copyMap[i][startCol]);
+      } else {
+        this.pathAlpha.push(arr[i][startCol]);
+      }
       if (arr[i][startCol] === SYMBOLS.END) {
         newDirection.end = SYMBOLS.END;
         break;
@@ -345,9 +405,14 @@ class PathFinder {
       }
       if (this.isAlpha(arr[i][startCol])) {
         this.collectAlphas.push(arr[i][startCol]);
+        changeDirAfterAlpha = this.alphaNewDir(arr, i, startCol);
+        if (changeDirAfterAlpha) {
+          newDirection = changeDirAfterAlpha;
+        }
         arr[i][startCol] = " ";
       }
       if (arr[i][startCol] === SYMBOLS.VERTICAL) {
+        console.log("vertical");
         arr[i][startCol] = " ";
         continue;
       }
@@ -363,68 +428,116 @@ class PathFinder {
   isAlpha = function (ch) {
     return /^[A-Z]$/i.test(ch);
   };
+
+  alphaNewDir(arr, row, col) {
+    // left up
+    // right up
+    // left down
+    // right down
+    let [left, right, up, down] = [false, false, false, false];
+    const lastSymbolTraversed = this.pathAlpha.at(this.pathAlpha.length - 2);
+
+    if (row === 0 && col === 0) {
+      if (
+        lastSymbolTraversed === SYMBOLS.VERTICAL &&
+        arr[row][col + 1] === SYMBOLS.HORIZONTAL
+      ) {
+        right = true;
+      }
+      if (
+        lastSymbolTraversed === SYMBOLS.HORIZONTAL &&
+        arr[row + 1][col] === SYMBOLS.VERTICAL
+      ) {
+        down = true;
+      }
+    }
+    if (row > 0 && col === 0) {
+      if (
+        lastSymbolTraversed === SYMBOLS.VERTICAL &&
+        arr[row][col + 1] === SYMBOLS.HORIZONTAL
+      ) {
+        if (lastSymbolTraversed === SYMBOLS.VERTICAL) {
+          right = true;
+        }
+      }
+    }
+
+    if (row === 0 && col > 0) {
+      //left and down
+      if (
+        lastSymbolTraversed === SYMBOLS.HORIZONTAL &&
+        arr[row + 1][col] === SYMBOLS.VERTICAL
+      ) {
+        if (lastSymbolTraversed === SYMBOLS.HORIZONTAL) {
+          down = true;
+        }
+        if (lastSymbolTraversed === SYMBOLS.VERTICAL) {
+          left = true;
+        }
+      }
+
+      //right and down
+      if (
+        arr[row + 1][col] === SYMBOLS.VERTICAL &&
+        arr[row].length - 1 > col + 1 &&
+        arr[row][col + 1] === SYMBOLS.HORIZONTAL
+      ) {
+        if (lastSymbolTraversed === SYMBOLS.HORIZONTAL) {
+          down = true;
+        }
+        if (lastSymbolTraversed === SYMBOLS.VERTICAL) {
+          right = true;
+        }
+      }
+    }
+
+    if (row > 0 && col > 0) {
+      //up left
+      if (lastSymbolTraversed === SYMBOLS.HORIZONTAL) {
+        if (arr[row - 1][col] === SYMBOLS.VERTICAL) {
+          up = true;
+        }
+        if (row < arr.length - 1) {
+          if (arr[row + 1][col] === SYMBOLS.VERTICAL) {
+            down = true;
+          }
+        }
+      }
+      if (lastSymbolTraversed === SYMBOLS.VERTICAL) {
+        if (arr[row][col - 1] === SYMBOLS.HORIZONTAL) {
+          left = true;
+        }
+        if (arr[row][col + 1] === SYMBOLS.HORIZONTAL) {
+          right = true;
+        }
+      }
+    }
+
+    const dirCheck = {
+      up,
+      down,
+      left,
+      right,
+    };
+
+    const direction = Object.entries(dirCheck)
+      .filter(([_, isTrue]) => isTrue)
+      .map(([direction]) => direction);
+
+    return { start: { row, col }, direction: direction[0] };
+  }
 }
 
-const testMapOne = [
-  ["@", "-", "-", "-", "A", "-", "-", "-", "+"],
-  [" ", " ", " ", " ", " ", " ", " ", " ", "|"],
-  ["x", "-", "B", "-", "+", " ", " ", " ", "C"],
-  [" ", " ", " ", " ", "|", " ", " ", " ", "|"],
-  [" ", " ", " ", " ", "+", "-", "-", "-", "+"],
-];
-
-const testMapTwo = [
-  ["@", " "],
-  ["|", " ", "+", "-", "C", "-", "-", "+"],
-  ["A", " ", "|", " ", " ", " ", " ", "|"],
-  ["+", "-", "-", "-", "B", "-", "-", "+"],
-  [" ", " ", " ", " ", " ", " ", " ", "x"],
-  [" ", " ", " ", " ", " ", " ", " ", "|"],
-  [" ", " ", " ", " ", " ", " ", " ", "+"],
-];
-
-const testMapThree = [
-  [" ", " ", "+", "-", "O", "-", "N", "-", "+"],
-  [" ", " ", "|", " ", " ", " ", " ", " ", "|"],
-  [" ", " ", "|", " ", " ", "+", "-", "I", "-", "+"],
-  ["@", "-", "G", "-", "O", "-", "+", " ", "|", " ", "|"],
-  [" ", " ", "|", " ", "|", " ", "+", "-", "+", " ", "E"],
-  [" ", "+", "-", "+", " ", " ", " ", " ", " ", "S"],
-  [" ", " ", " ", " ", " ", " ", "|"],
-  [" ", " ", " ", " ", " ", " ", "x"],
-];
-
-// const watchDuplicationPath = [
-//   [" ", " ", "+", "-", "O", "-", "N", "-", "+"],
-//   [" ", " ", "|", " ", " ", " ", " ", " ", "|"],
-//   [" ", " ", "|", " ", " ", "+", "-", "I", "-", "+"],
-//   ["@", "-", "G", "-", "O", "-", "+", " ", "|", " ", "|"],
-//   [" ", " ", "|", " ", "|", " ", "+", "-", "+", " ", "E"],
-//   [" ", "+", "-", "+", " ", " ", " ", " ", " ", "S"],
-//   [" ", " ", " ", " ", " ", " ", "|"],
-//   [" ", " ", " ", " ", " ", " ", "x"],
-// ];
-
-const crampedLetters = [
+const testMapFive = [
   [" ", "+", "-", "L", "-", "+"],
   [" ", "|", " ", " ", "+", "A", "-", "+"],
   ["@", "B", "+", " ", "+", "+", " ", "H"],
   [" ", "+", "+", " ", " ", " ", " ", "x"],
 ];
 
-// const testMapFour = [
-//   ["+", "-", "@", " ", "A", "-", "-", "+"],
-//   ["|", " ", " ", " ", "|", " ", " ", "|"],
-//   ["|", "x", "-", "B", "+", " ", " ", "C"],
-//   ["|", " ", " ", " ", " ", " ", " ", "|"],
-//   ["+", "-", "-", "-", "-", "-", "-", "+"],
-// ];
+// const pathOne = new PathFinder(testMapFive);
+// console.log(pathOne.traverse(testMapFive));
 
-const testUp = [
-  [" ", "+", "-", "+"],
-  [" ", "|", " ", "|", " ", " ", " ", " "],
-  [" ", "@", " ", "+", "-", "A", "-", "x"],
-];
-
-const pathOne = new PathFinder(testMapOne);
-console.log(pathOne.traverse(testMapOne));
+module.exports = {
+  PathFinder,
+};
